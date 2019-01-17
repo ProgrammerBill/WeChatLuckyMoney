@@ -19,6 +19,8 @@ import android.util.DisplayMetrics;
 import xyz.monkeytong.hongbao.utils.HongbaoSignature;
 import xyz.monkeytong.hongbao.utils.PowerUtil;
 
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.List;
 
 public class HongbaoService extends AccessibilityService implements SharedPreferences.OnSharedPreferenceChangeListener {
@@ -29,7 +31,7 @@ public class HongbaoService extends AccessibilityService implements SharedPrefer
     private static final String WECHAT_BETTER_LUCK_CH = "手慢了";
     private static final String WECHAT_EXPIRES_CH = "已超过24小时";
     private static final String WECHAT_VIEW_SELF_CH = "查看红包";
-    private static final String WECHAT_VIEW_OTHERS_CH = "领取红包";
+    private static final String WECHAT_VIEW_OTHERS_CH = "微信红包";
     private static final String WECHAT_NOTIFICATION_TIP = "[微信红包]";
     private static final String WECHAT_LUCKMONEY_RECEIVE_ACTIVITY = ".plugin.luckymoney.ui";//com.tencent.mm/.plugin.luckymoney.ui.En_fba4b94f  com.tencent.mm/com.tencent.mm.plugin.luckymoney.ui.LuckyMoneyReceiveUI
     private static final String WECHAT_LUCKMONEY_DETAIL_ACTIVITY = "LuckyMoneyDetailUI";
@@ -45,6 +47,8 @@ public class HongbaoService extends AccessibilityService implements SharedPrefer
 
     private PowerUtil powerUtil;
     private SharedPreferences sharedPreferences;
+
+    private ProcessBuilder mBuilder;
 
     /**
      * AccessibilityEvent
@@ -85,7 +89,6 @@ public class HongbaoService extends AccessibilityService implements SharedPrefer
         Log.d(TAG, "watchChat mLuckyMoneyReceived:" + mLuckyMoneyReceived + " mLuckyMoneyPicked:" + mLuckyMoneyPicked + " mReceiveNode:" + mReceiveNode);
         if (mLuckyMoneyReceived  && (mReceiveNode != null)) {
             mMutex = true;
-
             mReceiveNode.getParent().performAction(AccessibilityNodeInfo.ACTION_CLICK);
             mLuckyMoneyReceived = false;
             mLuckyMoneyPicked = true;
@@ -114,38 +117,7 @@ public class HongbaoService extends AccessibilityService implements SharedPrefer
         DisplayMetrics metrics = getResources().getDisplayMetrics();
         float dpi = metrics.densityDpi;
         Log.d(TAG, "openPacket！" +  dpi);
-        if (android.os.Build.VERSION.SDK_INT <= 23) {
-            mUnpackNode.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-        } else {
-            if (android.os.Build.VERSION.SDK_INT > 23) {
-                Path path = new Path();
-                if (640 == dpi) { //1440
-                    path.moveTo(720, 1575);
-                } else if(320 == dpi){//720p
-                    path.moveTo(355, 780);
-                }else if(480 == dpi){//1080p
-                    path.moveTo(533, 1115);
-                }
-                GestureDescription.Builder builder = new GestureDescription.Builder();
-                GestureDescription gestureDescription = builder.addStroke(new GestureDescription.StrokeDescription(path, 450, 50)).build();
-                dispatchGesture(gestureDescription, new GestureResultCallback() {
-                    @Override
-                    public void onCompleted(GestureDescription gestureDescription) {
-                        Log.d(TAG, "onCompleted");
-                        mMutex = false;
-                        super.onCompleted(gestureDescription);
-                    }
-
-                    @Override
-                    public void onCancelled(GestureDescription gestureDescription) {
-                        Log.d(TAG, "onCancelled");
-                        mMutex = false;
-                        super.onCancelled(gestureDescription);
-                    }
-                }, null);
-
-            }
-        }
+        mUnpackNode.performAction(AccessibilityNodeInfo.ACTION_CLICK);
     }
 
     private void setCurrentActivityName(AccessibilityEvent event) {
@@ -266,7 +238,6 @@ public class HongbaoService extends AccessibilityService implements SharedPrefer
 
         /* 戳开红包，红包还没抢完，遍历节点匹配“拆红包” */
         AccessibilityNodeInfo node2 = findOpenButton(this.rootNodeInfo);
-        Log.d(TAG, "checkNodeInfo  node2 " + node2);
         if (node2 != null && "android.widget.Button".equals(node2.getClassName()) && currentActivityName.contains(WECHAT_LUCKMONEY_RECEIVE_ACTIVITY)
                 && (mUnpackNode == null || mUnpackNode != null && !mUnpackNode.equals(node2))) {
             mUnpackNode = node2;
@@ -324,7 +295,6 @@ public class HongbaoService extends AccessibilityService implements SharedPrefer
         int bottom = 0;
         AccessibilityNodeInfo lastNode = null, tempNode;
         List<AccessibilityNodeInfo> nodes;
-
         for (String text : texts) {
             if (text == null) continue;
 

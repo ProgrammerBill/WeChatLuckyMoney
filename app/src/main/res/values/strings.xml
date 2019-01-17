@@ -55,4 +55,5 @@
     <string name="delay_then">然后</string>
     <string name="d">延迟0秒拆开红包</string>
     <string name="todo">TODO</string>
+    <string name="HAS_RECEIVED">已被领完</string>
 </resources>
